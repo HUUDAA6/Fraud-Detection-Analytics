@@ -1101,7 +1101,7 @@ with tab2:
                 def color_contrib(val):
                     if val > 0:
                         return 'background-color: #ffebee'  # Light red for positive (fraud)
-    else:
+                    else:
                         return 'background-color: #e8f5e8'  # Light green for negative (safe)
                 
                 styled_contrib = contributions.style.applymap(color_contrib, subset=['Contribution'])
