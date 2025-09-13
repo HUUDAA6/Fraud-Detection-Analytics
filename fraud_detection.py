@@ -282,7 +282,11 @@ def load_model_resource():
     import os, joblib
     for p in ["fraud_detection_pipeline.pkt", "fraud_detection_pipeline.pkl"]:
         if os.path.exists(p):
-            return joblib.load(p)
+            try:
+                return joblib.load(p)
+            except Exception as e:
+                st.error(f"Error loading model {p}: {str(e)}")
+                continue
     return None
 
 def get_target_col(df: pd.DataFrame) -> str:
@@ -303,13 +307,25 @@ def safe_select_X(df):
     return df[cols].copy(), []
 
 def proba(model, X):
-    if hasattr(model, "predict_proba"):
-        return model.predict_proba(X)[:,1]
-    if hasattr(model, "decision_function"):
-        import numpy as np
-        s = model.decision_function(X)
-        return 1/(1+np.exp(-s))
-    return None
+    try:
+        if hasattr(model, "predict_proba"):
+            return model.predict_proba(X)[:,1]
+        if hasattr(model, "decision_function"):
+            import numpy as np
+            s = model.decision_function(X)
+            return 1/(1+np.exp(-s))
+        return None
+    except Exception as e:
+        st.warning(f"Model prediction error: {str(e)}")
+        # Fallback: try direct prediction
+        try:
+            if hasattr(model, "predict"):
+                predictions = model.predict(X)
+                # Convert binary predictions to probabilities (rough approximation)
+                return predictions.astype(float)
+        except:
+            pass
+        return None
 
 def kpi_card(col, label, value):
     col.metric(label, value)
@@ -330,6 +346,15 @@ if 'threshold' not in st.session_state:
 
 # Load model
 model = load_model_resource()
+
+# Check scikit-learn version compatibility
+try:
+    import sklearn
+    sklearn_version = sklearn.__version__
+    if model is not None:
+        st.sidebar.info(f"scikit-learn: {sklearn_version}")
+except ImportError:
+    pass
 
 # ---------- Sidebar ----------
 with st.sidebar:
@@ -953,15 +978,15 @@ with tab2:
                                  key="predict_threshold_slider")
         
         # Real-time prediction
-        input_data = pd.DataFrame([{
-            "type": transaction_type,
-            "amount": amount,
-            "oldbalanceOrg": oldbalanceOrg,
-            "newbalanceOrig": newbalanceOrig,
-            "oldbalanceDest": oldbalanceDest,
-            "newbalanceDest": newbalanceDest
-        }])
-        
+    input_data = pd.DataFrame([{
+        "type": transaction_type,
+        "amount": amount,
+        "oldbalanceOrg": oldbalanceOrg,
+        "newbalanceOrig": newbalanceOrig,
+        "oldbalanceDest": oldbalanceDest,
+        "newbalanceDest": newbalanceDest
+    }])
+    
         # Get probability
         prob = proba(model, input_data)
         
@@ -1076,7 +1101,7 @@ with tab2:
                 def color_contrib(val):
                     if val > 0:
                         return 'background-color: #ffebee'  # Light red for positive (fraud)
-                    else:
+    else:
                         return 'background-color: #e8f5e8'  # Light green for negative (safe)
                 
                 styled_contrib = contributions.style.applymap(color_contrib, subset=['Contribution'])
