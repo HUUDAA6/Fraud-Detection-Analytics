@@ -987,38 +987,38 @@ with tab2:
         "newbalanceDest": newbalanceDest
     }])
     
-        # Get probability
-        prob = proba(model, input_data)
+    # Get probability
+    prob = proba(model, input_data)
+    
+    if prob is not None:
+        prob_val = float(prob[0])
+        pred_val = 1 if prob_val >= pred_threshold else 0
         
-        if prob is not None:
-            prob_val = float(prob[0])
-            pred_val = 1 if prob_val >= pred_threshold else 0
-            
-            # Display prediction result
-            st.subheader("Prediction Result")
-            
-            if pred_val == 1:
-                st.error(f"**FRAUD DETECTED**")
-                st.metric("Risk Probability", f"{prob_val*100:.1f}%", 
-                         delta=f"Above threshold ({pred_threshold*100:.1f}%)")
-            else:
-                st.success(f"**SAFE TRANSACTION**")
-                st.metric("Risk Probability", f"{prob_val*100:.1f}%", 
-                         delta=f"Below threshold ({pred_threshold*100:.1f}%)")
-            
-            # Risk level indicator
-            if prob_val >= 0.8:
-                risk_level = "🔴 High Risk"
-            elif prob_val >= 0.5:
-                risk_level = "🟡 Medium Risk"
-            elif prob_val >= 0.2:
-                risk_level = "🟠 Low Risk"
-            else:
-                risk_level = "🟢 Very Low Risk"
-            
-            st.info(f"Risk Level: {risk_level}")
+        # Display prediction result
+        st.subheader("Prediction Result")
+        
+        if pred_val == 1:
+            st.error(f"**FRAUD DETECTED**")
+            st.metric("Risk Probability", f"{prob_val*100:.1f}%", 
+                     delta=f"Above threshold ({pred_threshold*100:.1f}%)")
         else:
-            st.warning("Could not compute probability")
+            st.success(f"**SAFE TRANSACTION**")
+            st.metric("Risk Probability", f"{prob_val*100:.1f}%", 
+                     delta=f"Below threshold ({pred_threshold*100:.1f}%)")
+        
+        # Risk level indicator
+        if prob_val >= 0.8:
+            risk_level = "High Risk"
+        elif prob_val >= 0.5:
+            risk_level = "Medium Risk"
+        elif prob_val >= 0.2:
+            risk_level = "Low Risk"
+        else:
+            risk_level = "Very Low Risk"
+        
+        st.info(f"Risk Level: {risk_level}")
+    else:
+        st.warning("Could not compute probability")
 
     # What-if Analysis - Mobile-friendly
     with st.expander("What-If Analysis", expanded=False):
