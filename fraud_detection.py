@@ -316,15 +316,21 @@ def proba(model, X):
             return 1/(1+np.exp(-s))
         return None
     except Exception as e:
-        st.warning(f"Model prediction error: {str(e)}")
+        error_msg = str(e)
+        if "_name_to_fitted_passthrough" in error_msg:
+            st.warning("⚠️ Model compatibility issue: The model was trained with a different scikit-learn version")
+            st.info("Using fallback prediction method")
+        else:
+            st.warning(f"Model prediction error: {error_msg}")
+        
         # Fallback: try direct prediction
         try:
             if hasattr(model, "predict"):
                 predictions = model.predict(X)
                 # Convert binary predictions to probabilities (rough approximation)
                 return predictions.astype(float)
-        except:
-            pass
+        except Exception as fallback_error:
+            st.error(f"Fallback prediction also failed: {str(fallback_error)}")
         return None
 
 def kpi_card(col, label, value):
@@ -353,6 +359,17 @@ try:
     sklearn_version = sklearn.__version__
     if model is not None:
         st.sidebar.info(f"scikit-learn: {sklearn_version}")
+        
+        # Test model compatibility
+        try:
+            # Try a simple prediction to test compatibility
+            test_data = pd.DataFrame([[0, 1000, 10000, 9000, 0, 0]], 
+                                   columns=["type", "amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"])
+            model.predict(test_data)
+        except Exception as e:
+            st.sidebar.warning("⚠️ Model compatibility issue detected")
+            st.sidebar.error(f"Error: {str(e)[:50]}...")
+            st.sidebar.info("Some features may not work properly due to scikit-learn version mismatch.")
 except ImportError:
     pass
 
@@ -952,8 +969,9 @@ with tab1:
                             plt.tight_layout()
                             st.pyplot(fig)
                             
-                    except ImportError:
-                        st.warning("Could not compute feature importance - missing scikit-learn")
+                    except Exception as e:
+                        st.warning(f"Could not compute feature importance: {str(e)}")
+                        st.info("This may be due to scikit-learn version compatibility issues with the trained model.")
 
 # ---------- Predict ----------
 with tab2:
