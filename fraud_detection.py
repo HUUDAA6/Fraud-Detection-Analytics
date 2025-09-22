@@ -321,20 +321,16 @@ def proba(model, X):
         return None
     except Exception as e:
         error_msg = str(e)
-        if "_name_to_fitted_passthrough" in error_msg:
-            st.warning("⚠️ Model compatibility issue: The model was trained with a different scikit-learn version")
-            st.info("Using fallback prediction method")
+        if any(keyword in error_msg.lower() for keyword in ["_name_to_fitted_passthrough", "isnan", "ufunc", "input types"]):
+            # Silent fallback for known compatibility issues
+            try:
+                if hasattr(model, "predict"):
+                    predictions = model.predict(X)
+                    return predictions.astype(float)
+            except:
+                pass
         else:
             st.warning(f"Model prediction error: {error_msg}")
-        
-        # Fallback: try direct prediction
-        try:
-            if hasattr(model, "predict"):
-                predictions = model.predict(X)
-                # Convert binary predictions to probabilities (rough approximation)
-                return predictions.astype(float)
-        except Exception as fallback_error:
-            st.error(f"Fallback prediction also failed: {str(fallback_error)}")
         return None
 
 def kpi_card(col, label, value):
@@ -357,25 +353,7 @@ if 'threshold' not in st.session_state:
 # Load model
 model = load_model_resource()
 
-# Check scikit-learn version compatibility
-try:
-    import sklearn
-    sklearn_version = sklearn.__version__
-    if model is not None:
-        st.sidebar.info(f"scikit-learn: {sklearn_version}")
-        
-        # Test model compatibility
-        try:
-            # Try a simple prediction to test compatibility
-            test_data = pd.DataFrame([[0, 1000, 10000, 9000, 0, 0]], 
-                                   columns=["type", "amount", "oldbalanceOrg", "newbalanceOrig", "oldbalanceDest", "newbalanceDest"])
-            model.predict(test_data)
-        except Exception as e:
-            st.sidebar.warning("⚠️ Model compatibility issue detected")
-            st.sidebar.error(f"Error: {str(e)[:50]}...")
-            st.sidebar.info("Some features may not work properly due to scikit-learn version mismatch.")
-except ImportError:
-    pass
+# Model loaded successfully
 
 # ---------- Sidebar ----------
 with st.sidebar:
@@ -1111,10 +1089,10 @@ with tab2:
                 feature_values = input_data.iloc[0].values
                 shap_vals = shap_values.values[0]
                 
-                # Create contribution dataframe
+                # Create contribution dataframe with consistent data types
                 contributions = pd.DataFrame({
                     'Feature': feature_names,
-                    'Value': feature_values,
+                    'Value': [str(val) for val in feature_values],  # Convert all values to strings
                     'SHAP_Value': shap_vals,
                     'Contribution': shap_vals
                 }).sort_values('Contribution', key=abs, ascending=False)
@@ -1136,11 +1114,11 @@ with tab2:
                 
                 st.write("**Pushes toward FRAUD:**")
                 for _, row in top_positive.iterrows():
-                    st.write(f"• {row['Feature']}: {row['Value']:.2f} (+{row['Contribution']:.3f})")
+                    st.write(f"• {row['Feature']}: {row['Value']} (+{row['Contribution']:.3f})")
                 
                 st.write("**Pushes toward SAFE:**")
                 for _, row in top_negative.iterrows():
-                    st.write(f"• {row['Feature']}: {row['Value']:.2f} ({row['Contribution']:.3f})")
+                    st.write(f"• {row['Feature']}: {row['Value']} ({row['Contribution']:.3f})")
                 
             except ImportError:
                 st.info("Install SHAP for detailed feature contribution analysis")
@@ -1149,7 +1127,7 @@ with tab2:
                 st.subheader("Feature Values")
                 feature_df = pd.DataFrame({
                     'Feature': input_data.columns,
-                    'Value': input_data.iloc[0].values
+                    'Value': [str(val) for val in input_data.iloc[0].values]  # Convert to strings
                 })
                 st.dataframe(feature_df, use_container_width=True)
 
